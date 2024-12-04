@@ -25,6 +25,7 @@ impl Grid {
         let (x, y) = coords;
         let x_idx = (pos / self.array_width) as isize + x;
         let y_idx = (pos % self.array_width) as isize + y;
+        let num_rows = self.grid.len() / self.array_width;
         if self.is_valid_position(x_idx, y_idx) {
             Some(x_idx as usize * self.array_width + y_idx as usize)
         } else {
@@ -34,7 +35,7 @@ impl Grid {
 
     fn is_valid_position(&self, x_idx: isize, y_idx: isize) -> bool {
         let num_rows = self.grid.len() / self.array_width;
-        (0..self.array_width).contains(&(x_idx as usize)) && (0..num_rows).contains(&(y_idx as usize))
+        (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < num_rows as isize)
     }
 
     fn len(&self) -> usize {
@@ -43,6 +44,27 @@ impl Grid {
 
     fn peek(&self, pos: usize) -> char {
         self.grid[pos]
+    }
+
+    fn find_words(&self, target_str: &[char], directions: &[(isize, isize)]) -> Vec<Vec<usize>> {
+        let mut solutions = vec![];
+        for pos in 0..self.len() {
+            for direction in directions {
+                let mut current_pos = pos;
+                let mut sol = vec![];
+                while sol.len() < target_str.len() && self.peek(current_pos) == target_str[sol.len()] {
+                    sol.push(current_pos);
+                    match self.move_pos(current_pos, *direction) {
+                        Some(new_pos) => current_pos = new_pos,
+                        None => break,
+                    }
+                };
+                if sol.len() == target_str.len() {
+                    solutions.push(sol);
+                }
+            }
+        }
+        solutions
     }
 }
 
@@ -58,24 +80,7 @@ fn part1(grid: &Grid) -> usize {
         (-1, -1), // lower left
         (1, -1) // lower right
     ];
-    let mut num_solutions = 0;
-    for pos in 0..grid.len() {
-        for direction in directions {
-            let mut current_pos = pos;
-            let mut sol_idx = 0;
-            while sol_idx < 4 && grid.peek(current_pos) == target_str[sol_idx] {
-                sol_idx += 1;
-                match grid.move_pos(current_pos, direction) {
-                    Some(new_pos) => current_pos = new_pos,
-                    None => break,
-                }
-            };
-            if sol_idx == 4 {
-                num_solutions += 1;
-            }
-        }
-    }
-    num_solutions
+    grid.find_words(&target_str, &directions).iter().count()
 }
 
 fn part2(grid: &Grid) -> usize {
@@ -86,26 +91,11 @@ fn part2(grid: &Grid) -> usize {
         (-1, -1), // lower left
         (1, -1) // lower right
     ];
-    let mut a_pos = vec![];
-    for pos in 0..grid.len() {
-        for direction in directions {
-            let mut current_pos = pos;
-            let mut sol = vec![];
-            while sol.len() < 3 && grid.peek(current_pos) == target_str[sol.len()] {
-                sol.push(current_pos);
-                match grid.move_pos(current_pos, direction) {
-                    Some(new_pos) => current_pos = new_pos,
-                    None => break,
-                }
-            };
-            if sol.len() == 3 {
-                a_pos.push(sol[1]);
-            }
-        }
-    }
+    let solutions = grid.find_words(&target_str, &directions);
     let mut result = HashMap::new();
-    for item in a_pos {
-        *result.entry(item).or_insert(0) += 1;
+    // looking for solutions that share the a position
+    for sol in solutions {
+        *result.entry(sol[1]).or_insert(0) += 1;
     }
     result.iter().filter(|&(_, &v)| v > 1).count()
 }
