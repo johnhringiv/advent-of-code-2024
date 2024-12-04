@@ -1,20 +1,5 @@
-use adv_code_2024::*;
-use code_timing_macros::time_snippet;
-use const_format::concatcp;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
-const DAY: &str = "02";
-const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
-
-const TEST: &str = "\
-7 6 4 2 1
-1 2 7 8 9
-9 7 6 2 1
-1 3 2 4 5
-8 6 4 4 1
-1 3 6 7 9
-";
 
 fn parse_data<R: BufRead>(reader: R) -> Vec<Vec<i32>> {
     let mut data = Vec::new();
@@ -89,24 +74,43 @@ fn part2(data: &Vec<Vec<i32>>) -> usize {
         .count();
     result
 }
+pub fn solve() -> (usize, usize) {
+    let input_file = BufReader::new(File::open("input/02.txt").unwrap());
+    let data = parse_data(input_file);
+    let p1 = part1(&data);
+    let p2 = part2(&data);
+    (p1, p2)
+}
 
-fn main() {
-    start_day(DAY);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    println!("=== Load Data ===");
-    let input_file = BufReader::new(File::open(INPUT_FILE).unwrap());
-    let data = time_snippet!(parse_data(input_file));
-    let data_test = parse_data(BufReader::new(TEST.as_bytes()));
+    const TEST: &str = "\
+7 6 4 2 1
+1 2 7 8 9
+9 7 6 2 1
+1 3 2 4 5
+8 6 4 4 1
+1 3 6 7 9
+";
 
-    println!("\n=== Part 1 ===");
-    assert_eq!(2, part1(&data_test));
-    let result = time_snippet!(part1(&data));
-    println!("Result = {}", result);
+    #[test]
+    fn test_part1() {
+        let input_file = BufReader::new(TEST.as_bytes());
+        let data = parse_data(input_file);
+        assert_eq!(2, part1(&data));
+    }
 
-    println!("\n=== Part 2 ===");
+    #[test]
+    fn test_part2() {
+        let input_file = BufReader::new(TEST.as_bytes());
+        let data = parse_data(input_file);
+        assert_eq!(4, part2(&data));
+    }
 
-    assert_eq!(4, part2(&data_test));
-
-    let result = time_snippet!(part2(&data));
-    println!("Result = {}", result);
+    #[test]
+    fn test_solution() {
+        assert_eq!((402, 455), solve());
+    }
 }

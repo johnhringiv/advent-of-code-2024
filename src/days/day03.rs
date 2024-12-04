@@ -1,15 +1,6 @@
-use adv_code_2024::*;
-use code_timing_macros::time_snippet;
-use const_format::concatcp;
 use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
-const DAY: &str = "03";
-const INPUT_FILE: &str = concatcp!("input/", DAY, ".txt");
-
-const TEST: &str = "\
-xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))";
 
 fn part1<R: BufRead>(reader: R) -> usize {
     let re = Regex::new(r"mul\((\d+),(\d+)\)").unwrap();
@@ -48,20 +39,33 @@ fn part2<R: BufRead>(reader: R) -> usize {
     result
 }
 
-fn main() {
-    start_day(DAY);
+pub fn solve() -> (usize, usize) {
+    let input_file = BufReader::new(File::open("input/03.txt").unwrap());
+    let p1 = part1(input_file);
+    let input_file = BufReader::new(File::open("input/03.txt").unwrap());
+    let p2 = part2(input_file);
+    (p1, p2)
+}
 
-    let input_file = BufReader::new(File::open(INPUT_FILE).unwrap());
-    println!("\n=== Part 1 ===");
-    assert_eq!(161, part1(BufReader::new(TEST.as_bytes())));
-    let result = time_snippet!(part1(input_file));
-    println!("Result = {}", result);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    println!("\n=== Part 2 ===");
-    part2(BufReader::new(TEST.as_bytes()));
-    assert_eq!(48, part2(BufReader::new(TEST.as_bytes())));
+    const TEST: &str = "\
+xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))";
 
-    let input_file = BufReader::new(File::open(INPUT_FILE).unwrap());
-    let result = time_snippet!(part2(input_file));
-    println!("Result = {}", result);
+    #[test]
+    fn test_part1() {
+        assert_eq!(161, part1(BufReader::new(TEST.as_bytes())));
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(48, part2(BufReader::new(TEST.as_bytes())));
+    }
+
+    #[test]
+    fn test_solve() {
+        assert_eq!((169021493, 111762583), solve());
+    }
 }
