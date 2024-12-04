@@ -10,32 +10,31 @@ struct Grid {
 impl Grid {
     fn parse_data<R: BufRead>(reader: R) -> Grid {
         let mut file_iter = reader.lines();
-        let mut grid = file_iter.next().unwrap().unwrap().chars().collect::<Vec<char>>();
+        let mut grid = file_iter
+            .next()
+            .unwrap()
+            .unwrap()
+            .chars()
+            .collect::<Vec<char>>();
         let array_width = grid.len();
         while let Some(line) = file_iter.next() {
             grid.extend(line.unwrap().chars());
         }
-        Grid {
-            grid,
-            array_width,
-        }
+        Grid { grid, array_width }
     }
-    
+
     fn move_pos(&self, pos: usize, coords: (isize, isize)) -> Option<usize> {
         let (x, y) = coords;
         let x_idx = (pos / self.array_width) as isize + x;
         let y_idx = (pos % self.array_width) as isize + y;
-        let num_rows = self.grid.len() / self.array_width;
-        if self.is_valid_position(x_idx, y_idx) {
+        let num_rows = (self.grid.len() / self.array_width) as isize;
+
+        if (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < num_rows)
+        {
             Some(x_idx as usize * self.array_width + y_idx as usize)
         } else {
             None
         }
-    }
-
-    fn is_valid_position(&self, x_idx: isize, y_idx: isize) -> bool {
-        let num_rows = self.grid.len() / self.array_width;
-        (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < num_rows as isize)
     }
 
     fn len(&self) -> usize {
@@ -52,13 +51,15 @@ impl Grid {
             for direction in directions {
                 let mut current_pos = pos;
                 let mut sol = vec![];
-                while sol.len() < target_str.len() && self.peek(current_pos) == target_str[sol.len()] {
+                while sol.len() < target_str.len()
+                    && self.peek(current_pos) == target_str[sol.len()]
+                {
                     sol.push(current_pos);
                     match self.move_pos(current_pos, *direction) {
                         Some(new_pos) => current_pos = new_pos,
                         None => break,
                     }
-                };
+                }
                 if sol.len() == target_str.len() {
                     solutions.push(sol);
                 }
@@ -71,14 +72,14 @@ impl Grid {
 fn part1(grid: &Grid) -> usize {
     let target_str = ['X', 'M', 'A', 'S'];
     let directions = [
-        (-1, 0), // left
-        (1, 0), // right
-        (0, 1), // up
-        (0, -1), // down
-        (-1, 1), // upper left
-        (1, 1), // upper right
+        (-1, 0),  // left
+        (1, 0),   // right
+        (0, 1),   // up
+        (0, -1),  // down
+        (-1, 1),  // upper left
+        (1, 1),   // upper right
         (-1, -1), // lower left
-        (1, -1) // lower right
+        (1, -1),  // lower right
     ];
     grid.find_words(&target_str, &directions).iter().count()
 }
@@ -86,10 +87,10 @@ fn part1(grid: &Grid) -> usize {
 fn part2(grid: &Grid) -> usize {
     let target_str = ['M', 'A', 'S'];
     let directions = [
-        (-1, 1), // upper left
-        (1, 1), // upper right
+        (-1, 1),  // upper left
+        (1, 1),   // upper right
         (-1, -1), // lower left
-        (1, -1) // lower right
+        (1, -1),  // lower right
     ];
     let solutions = grid.find_words(&target_str, &directions);
     let mut result = HashMap::new();
@@ -131,7 +132,7 @@ MXMXAXMASX
         let grid = Grid::parse_data(input_file);
         assert_eq!(18, part1(&grid));
     }
-    
+
     #[test]
     fn test_part2() {
         let input_file = BufReader::new(TEST.as_bytes());
