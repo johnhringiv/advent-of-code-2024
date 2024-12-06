@@ -12,31 +12,40 @@ fn parse_data<R: BufRead>(reader: R) -> (HashMap<usize, HashSet<usize>>, Vec<Vec
             if line == "" {
                 parse_rules = false;
             } else {
-                let rule = line.split('|').map(|s| s.parse::<usize>().unwrap()).collect::<Vec<usize>>();
-                ordering_rules.entry(rule[0]).or_insert(HashSet::new()).insert(rule[1]);
+                let rule = line
+                    .split('|')
+                    .map(|s| s.parse::<usize>().unwrap())
+                    .collect::<Vec<usize>>();
+                ordering_rules
+                    .entry(rule[0])
+                    .or_insert(HashSet::new())
+                    .insert(rule[1]);
             }
         } else {
-            let row = line.split(',').map(|s| s.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+            let row = line
+                .split(',')
+                .map(|s| s.parse::<usize>().unwrap())
+                .collect::<Vec<usize>>();
             pages.push(row);
         }
     }
     (ordering_rules, pages)
 }
 
-fn combined(ordering_rules: &HashMap<usize, HashSet<usize>>, updates: &Vec<Vec<usize>>) -> (usize, usize) {
+fn combined(
+    ordering_rules: &HashMap<usize, HashSet<usize>>,
+    updates: &Vec<Vec<usize>>,
+) -> (usize, usize) {
     fn is_valid(ordering_rules: &HashMap<usize, HashSet<usize>>, update: &[usize]) -> bool {
         let mut previous = HashSet::with_capacity(update.len());
         for page in update.iter() {
-            match ordering_rules.get(page) {
-                Some(rules) => {
-                    let res = rules.intersection(&previous).count();
-                    previous.insert(page.to_owned());
-                    if res > 0 {
-                        return false;
-                    }
+            if let Some(rules) = ordering_rules.get(page) {
+                let res = rules.intersection(&previous).count();
+                if res > 0 {
+                    return false;
                 }
-                None => {previous.insert(page.to_owned());},
             }
+            previous.insert(page.to_owned());
         }
         true
     }
@@ -54,7 +63,9 @@ fn combined(ordering_rules: &HashMap<usize, HashSet<usize>>, updates: &Vec<Vec<u
                 }
             }
             p2 += fixed[fixed.len() / 2];
-        } else { p1 += update[update.len() / 2]; }
+        } else {
+            p1 += update[update.len() / 2];
+        }
     }
     (p1, p2)
 }
@@ -106,14 +117,14 @@ mod tests {
         let (ordering_rules, updates) = parse_data(input_file);
         assert_eq!(143, combined(&ordering_rules, &updates).0);
     }
-    
+
     #[test]
     fn test_part2() {
         let input_file = BufReader::new(TEST.as_bytes());
         let (ordering_rules, updates) = parse_data(input_file);
         assert_eq!(123, combined(&ordering_rules, &updates).1);
     }
-    
+
     #[test]
     fn test_sol() {
         assert_eq!((6260, 5346), solve());
