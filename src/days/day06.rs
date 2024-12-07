@@ -25,13 +25,16 @@ impl Grid {
         Grid { grid, array_width }
     }
 
-    fn pos_to_coords(&self, pos: usize) -> (isize, isize) {
-        ((pos % self.array_width) as isize, (pos / self.array_width) as isize)
+    fn pos_to_coords(&self, pos: usize) -> (usize, usize) {
+        ((pos % self.array_width), (pos / self.array_width))
+    }
+
+    fn coords_to_pos(&self, x: usize, y: usize) -> usize {
+        y * self.array_width + x
     }
 
     fn move_pos(&self, pos: usize, coords: (isize, isize)) -> Option<usize> {
         let (x, y) = coords;
-        //todo fix in day04
         let y_idx = (pos / self.array_width) as isize + y;
         let x_idx = (pos % self.array_width) as isize + x;
         let num_rows = (self.grid.len() / self.array_width) as isize;
@@ -50,10 +53,6 @@ impl Grid {
 
     fn peek(&self, pos: usize) -> char {
         self.grid[pos]
-    }
-
-    fn update_cell(&mut self, pos: usize, c: char) {
-        self.grid[pos] = c;
     }
 }
 
@@ -81,245 +80,166 @@ fn find_guard(grid: &Grid) -> Option<(usize, (isize, isize))> {
     Some((pos, direction))
 }
 
-fn move_guard(grid: &Grid, pos: usize, direction: (isize, isize)) -> Option<(usize, (isize, isize))> {
-    match grid.move_pos(pos, direction) {
+fn map_obstructions(grid: &Grid) -> (HashMap<usize, HashSet<usize>>, HashMap<usize, HashSet<usize>>) {
+    let mut obs_x = HashMap::new();
+    let mut obs_y = HashMap::new();
+
+    for (idx, c) in grid.grid.iter().enumerate() {
+        if *c == '#' {
+            let (x, y) = grid.pos_to_coords(idx);
+            obs_x.entry(x).or_insert(HashSet::new()).insert(y);
+            obs_y.entry(y).or_insert(HashSet::new()).insert(x);
+        }
+    }
+    (obs_x, obs_y)
+}
+
+fn get_next_obs(cur_pos: usize, grid: &Grid, direction: &(isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> Option<(usize, (isize, isize))> {
+    let (x, y) = grid.pos_to_coords(cur_pos);
+    let mut obs_coords = None;
+    match direction {
+        (0, -1) => {
+            if let Some(obs) = obs_x.get(&x) {
+                if let Some(next_y) = obs.iter().filter(|&&o| y > o).max() {
+                    obs_coords = Some((x, *next_y));
+                }
+            }
+        },
+        (0, 1) => {
+            if let Some(obs) = obs_x.get(&x) {
+                if let Some(next_y) = obs.iter().filter(|&&o| y < o).min() {
+                    obs_coords = Some((x, *next_y));
+                }
+            }
+        },
+        (-1, 0) => {
+            if let Some(obs) = obs_y.get(&y) {
+                if let Some(next_x) = obs.iter().filter(|&&o| x > o).max() {
+                    obs_coords = Some((*next_x, y));
+                }
+            }
+        },
+        (1, 0) => {
+            if let Some(obs) = obs_y.get(&y) {
+                if let Some(next_x) = obs.iter().filter(|&&o| x < o).min() {
+                    obs_coords = Some((*next_x, y));
+                }
+            }
+        },
+        _ => {}
+    }
+    // we need to stop short of the next obs and turn
+    // this returns the point before the obs and the new direction
+    match obs_coords {
+        Some(obs_coords) => {
+            let new_direction = change_direction(&direction);
+            Some((grid.coords_to_pos((obs_coords.0 as isize - direction.0) as usize, (obs_coords.1 as isize - direction.1) as usize), new_direction))
+        },
+        _ => {
+            None
+        },
+    }
+}
+
+fn change_direction(direction: &(isize, isize)) -> (isize, isize) {
+    match direction {
+        (0, -1) => (1, 0),
+        (0, 1) => (-1, 0),
+        (-1, 0) => (0, - 1),
+        (1, 0) => (0, 1),
+        _ => panic!("Invalid direction"),
+    }
+}
+
+fn move_guard(grid: &Grid, pos: usize, direction: &(isize, isize)) -> Option<(usize, (isize, isize))> {
+    match grid.move_pos(pos, *direction) {
         Some(new_pos) => {
             match grid.peek(new_pos) {
                 '#' => {
-                    let new_direction = match direction {
-                        (0, -1) => (1, 0),
-                        (0, 1) => (-1, 0),
-                        (-1, 0) => (0, -1),
-                        (1, 0) => (0, 1),
-                        _ => panic!("Invalid direction"),
-                    };
+                    let new_direction = change_direction(&direction);
                     Some((pos, new_direction))
                 },
                 _ => {
-                    Some((new_pos, direction))
+                    Some((new_pos, *direction))
                 },
             }
         },
         None => None,
     }
-    // check if new_pos is an obstacle
 }
-
-fn part1(grid: &mut Grid) -> usize {
-    let mut guard_pos = find_guard(grid);
-    let mut visited = HashSet::new();
+fn get_visited(grid: &Grid, start: &Option<(usize, (isize, isize))>) -> HashMap<usize, (isize, isize)> {
+    let mut guard_pos = start.clone();
+    let mut states = HashMap::new();
     loop {
         match guard_pos {
             Some((pos, direction)) => {
-                visited.insert(guard_pos.unwrap().0);
-                guard_pos = move_guard(&grid, pos, direction);
+                match states.get(&pos) {
+                    Some(_) => {},
+                    None => { states.insert(pos, direction); }
+                }
+                guard_pos = move_guard(&grid, pos, &direction);
             },
             None => break,
         }
     }
-    visited.len()
+    states
 }
 
-fn has_loop(grid: &Grid) -> bool {
-    let mut guard_pos = find_guard(grid);
-    let mut visited = HashSet::new();
+fn has_loop(grid: &Grid, temp_obs: usize, start_direction: (isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> bool {
     let mut visited_obs = HashMap::new();
-    let mut cur_position = -1;
-    let mut step = 0;
+    let (x, y) = grid.pos_to_coords(temp_obs);
+    let mut pos = grid.coords_to_pos((x as isize - start_direction.0) as usize, (y as isize - start_direction.1) as usize);
+    let mut direction = start_direction;
     loop {
-        match guard_pos {
-            Some((pos, direction)) => {
-                visited.insert(guard_pos.unwrap().0);
-                if pos as isize == cur_position {
-                    match visited_obs.get(&pos) {
-                        Some(count) => {
-                            if *count > 1 {
-                                return true
-                            }
-                            visited_obs.insert(pos, count + 1);
+        match get_next_obs(pos, grid, &direction, &obs_x, &obs_y) {
+            Some((obs_pos, new_direction)) => {
+                match visited_obs.get(&pos) {
+                    Some(count) => {
+                        if *count > 2 {
+                            return true
                         }
-                        None => { visited_obs.insert(pos, 1); }
+                        visited_obs.insert(pos, count + 1);
                     }
+                    None => { visited_obs.insert(pos, 1); }
                 }
-                cur_position = pos as isize;
-                guard_pos = move_guard(&grid, pos, direction);
-                step += 1;
+                pos = obs_pos;
+                direction = new_direction;
             },
-            None => return false
+            None => {
+                return false
+            },
         }
     }
 }
 
-fn part2(grid: &Grid) -> usize {
-    // brute force test every psoition visited in part 1
-    // slightly better would be to use the direction of the guard must be opsticals on the same x, y
-    let mut guard_pos = find_guard(grid);
-    let starting_pos = guard_pos.unwrap().0;
-    let mut visited = HashSet::new();
-    loop {
-        match guard_pos {
-            Some((pos, direction)) => {
-                visited.insert(guard_pos.unwrap().0);
-                guard_pos = move_guard(&grid, pos, direction);
-            },
-            None => break,
-        }
-    }
-    let obstacles = grid.grid.iter().enumerate().filter(|(i, c)| **c == '#').map(|(i, _)| grid.pos_to_coords(i)).collect::<Vec<(isize, isize)>>();
-    visited.remove(&starting_pos);
-    // loop is 4 turns with same set of elemnts
-    // for the box with [bottom left](x1, y1) we need [top left](x1+1, y2) [top right](x2, y2+1), [bottom right](x2-1, y1+1)
-    // find obstacles that meet the above criteria
-    // for each point in visited let that point be each corner check if existing obsticals meet the criteria
+fn combined(grid: &Grid) -> (usize, usize) {
+    let start = find_guard(&grid);
+    let mut visited = get_visited(&grid, &start);
+    let p1 = visited.len();
 
-    fn check_bottom_left(bottom_left: (isize, isize), obstacles: &[(isize, isize)]) -> Vec<[(isize, isize); 4]> {
-        let mut res = vec![];
-        let (x1, y1) = bottom_left;
-        let top_left_candidates: Vec<isize>= obstacles.iter().filter(|(obs_x, _)| *obs_x == x1+1).map(|(_, y2)| y2.to_owned()).collect();
-        for y2 in top_left_candidates {
-            let top_right_candidates = obstacles.iter().filter(|(_, obs_y)| *obs_y == y2+1).map(|(x2, _)| x2.to_owned()).collect::<Vec<isize>>();
-            for x2 in top_right_candidates {
-                let bottom_right_exists = obstacles.iter().filter(|(obs_x, obs_y)| *obs_x == x2-1 && *obs_y == y1+1).count() > 0;
-                if bottom_right_exists {
-                    res.push([(x1, y1), (x1+1, y2), (x2, y2+1), (x2-1, y1+1)]);
-                }
-            }
-        }
-        res
-    }
-
-    fn check_top_left(top_left: (isize, isize), obstacles: &[(isize, isize)]) -> Vec<[(isize, isize); 4]> {
-        let mut res = vec![];
-        let (x, y2) = top_left;
-        let x1 = x-1;
-        let x2_from_top_right = obstacles.iter().filter(|(_, obs_y)| *obs_y == y2+1).map(|(x2, _)| x2.to_owned()).collect::<Vec<isize>>();
-        for x2 in x2_from_top_right {
-            let bottom_left_candidates = obstacles.iter().filter(|(obs_x, obs_y)| *obs_x == x1).map(|(_, y1)| y1.to_owned()).collect::<Vec<isize>>();
-            for y1 in bottom_left_candidates {
-                let box_coords = vec![(x1, y1), (x2, y2+1), (x2-1, y1+1)];
-                if box_coords.iter().map(|coords| obstacles.contains(&coords)).all(|x| x) {
-                    res.push([(x1, y1), (x1+1, y2), (x2, y2+1), (x2-1, y1+1)]);
-                }
-            }
-        }
-        res
-    }
-
-    fn check_top_right(top_left: (isize, isize), obstacles: &[(isize, isize)]) -> Vec<[(isize, isize); 4]> {
-        // for the box with [bottom left](x1, y1) we need [top left](x1+1, y2) [top right](x2, y2+1), [bottom right](x2-1, y1+1)
-        // with top right x2 and y2 are defined
-
-        let mut res = vec![];
-        let (x2, tmp) = top_left;
-        let y2 = tmp - 1;
-
-        // we need to check all potential x1, y1
-        let x1_from_top_left = obstacles.iter().filter(|(_, obs_y)| *obs_y == y2).map(|(x, _)| x-1.to_owned()).collect::<Vec<isize>>();
-        let y1_from_bottom_right: Vec<isize> = obstacles.iter().filter(|(obs_x, obs_y)| *obs_x == x2-1).map(|(_, y)| y-1.to_owned()).collect();
-
-        for &x1 in x1_from_top_left.iter() {
-            for &y1 in y1_from_bottom_right.iter() {
-                // check for box
-                // we exclude the top right corner
-                let box_coords = vec![(x1, y1), (x1+1, y2), (x2-1, y1+1)];
-                if box_coords.iter().map(|coords| obstacles.contains(&coords)).all(|x| x) {
-                    res.push([(x1, y1), (x1+1, y2), (x2, y2+1), (x2-1, y1+1)]);
-                }
-            }
-        }
-
-        res
-    }
-
-    fn check_bottom_right(bottom_right: (isize, isize), obstacles: &[(isize, isize)]) -> Vec<[(isize, isize); 4]> {
-        // for the box with [bottom left](x1, y1) we need [top left](x1+1, y2) [top right](x2, y2+1), [bottom right](x2-1, y1+1)
-        let mut res = vec![];
-        let (temp_x, temp_y) = bottom_right;
-        let x2 = temp_x + 1;
-        let y1 = temp_y - 1;
-        let top_right_candidates = obstacles.iter().filter(|(obs_x, obs_y)| *obs_x == x2).map(|(_, y)| y-1).collect::<Vec<isize>>();
-        for y2 in top_right_candidates {
-            let top_left_candidates = obstacles.iter().filter(|(_, obs_y)| *obs_y == y2).map(|(x, _)| x-1).collect::<Vec<isize>>();
-            for x1 in top_left_candidates {
-                let bottom_left_exists = obstacles.iter().filter(|(obs_x, obs_y)| *obs_x == x1 && *obs_y == y1).count() > 0;
-                if bottom_left_exists {
-                    res.push([(x1, y1), (x1+1, y2), (x2, y2+1), (x2-1, y1+1)]);
-                }
-            }
-        }
-        res
-    }
-
-    // need to filter to hittable points
-
-
-    let mut solutions = HashSet::new();
-    for point in visited {
-        // we could try every point as bottom left and check if the other 3 points exist
-        //let mut all_points = obstacles.clone();
-        //all_points.push(grid.pos_to_coords(point));
-        //for p in &all_points {
-        //    let res = check_top_left(*p, &all_points);
-        //    if res.len() > 0 {
-        //        //println!("{:?}", point);
-        //        solutions.insert(point);
-        //        break
-        //    }
-        //}
-        for check_fun in vec![check_bottom_left, check_top_left, check_top_right, check_bottom_right] {
-            let mut all_points = obstacles.clone();
-            all_points.push(grid.pos_to_coords(point));
-            let res = check_fun(grid.pos_to_coords(point), &all_points);
-            if res.len() > 0 {
-                solutions.insert(point);
-                break
-            }
-        }
-    }
-    let mut filtered = 0;
-    for sol in solutions {
-        let mut my_grid = grid.clone();
-        my_grid.update_cell(sol, '#');
-        if has_loop(&my_grid) {
-            filtered += 1;
-        }
-    }
-    filtered
-}
-
-fn brute(grid: Grid) -> usize {
-    let mut guard_pos = find_guard(&grid);
-    let start_pos = guard_pos.unwrap().0;
-    let mut visited = HashSet::new();
-    loop {
-        match guard_pos {
-            Some((pos, direction)) => {
-                visited.insert(guard_pos.unwrap().0);
-                guard_pos = move_guard(&grid, pos, direction);
-            },
-            None => break,
-        }
-    }
-
-    visited.remove(&start_pos);
     let mut sol = 0;
-    for pos in visited {
-        let mut new_grid = grid.clone();
-        new_grid.update_cell(pos, '#');
-        if has_loop(&new_grid) {
+    let (mut obs_x, mut obs_y) = map_obstructions(&grid).to_owned();
+    visited.remove(&start.unwrap().0);
+    for (pos, dir) in visited.iter() {
+        // placing an obs at pos means we need to start at pos - direction
+        let (x, y) = grid.pos_to_coords(*pos);
+        obs_x.entry(x).or_insert(HashSet::new()).insert(y);
+        obs_y.entry(y).or_insert(HashSet::new()).insert(x);
+
+        if has_loop(&grid, *pos, *dir, &obs_x, &obs_y) {
             sol += 1;
         }
+        //cleanup obs
+        obs_x.get_mut(&x).unwrap().remove(&y);
+        obs_y.get_mut(&y).unwrap().remove(&x);
     }
-    sol
+    (p1, sol)
 }
 
 pub fn solve() -> (usize, usize) {
     let input_file = std::fs::File::open("input/06.txt").expect("file not found");
-    let mut grid = Grid::parse_data(std::io::BufReader::new(input_file));
-    let p1 = part1(&mut grid);
-    let p2 = brute(grid);
-    //let p2 = part2(&grid);
-    (p1, p2)
+    let grid = Grid::parse_data(std::io::BufReader::new(input_file));
+    combined(&grid)
 }
 
 #[cfg(test)]
@@ -343,20 +263,19 @@ mod tests {
     #[test]
     fn test_part1() {
         let input_file = BufReader::new(TEST.as_bytes());
-        let mut grid = Grid::parse_data(input_file);
-        assert_eq!(part1(&mut grid), 41);
+        let grid = Grid::parse_data(input_file);
+        assert_eq!(combined(&grid).0, 41);
     }
 
     #[test]
     fn test_part2() {
         let input_file = BufReader::new(TEST.as_bytes());
         let grid = Grid::parse_data(input_file);
-        assert_eq!(brute(grid), 6);
+        assert_eq!(combined(&grid).1, 6);
     }
 
     #[test]
     fn test_sol() {
-        let (p1, p2) = solve();
         assert_eq!((4883, 1655), solve())
     }
 }
