@@ -5,7 +5,7 @@ mod days;
 use days::*;
 
 fn main() {
-    let days = [day01::solve, day02::solve, day03::solve, day04::solve, day05::solve];
+    let days = [day01::solve, day02::solve, day03::solve, day04::solve, day05::solve, day06::solve];
     println!(
         "{0: <3} | {1: <10} | {2: <14} | {3: <10}",
         "Day", "Part 1", "Part 2", "μs"
