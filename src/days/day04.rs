@@ -25,13 +25,13 @@ impl Grid {
 
     fn move_pos(&self, pos: usize, coords: (isize, isize)) -> Option<usize> {
         let (x, y) = coords;
-        let x_idx = (pos / self.array_width) as isize + x;
-        let y_idx = (pos % self.array_width) as isize + y;
+        let y_idx = (pos / self.array_width) as isize + y;
+        let x_idx = (pos % self.array_width) as isize + x;
         let num_rows = (self.grid.len() / self.array_width) as isize;
 
         if (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < num_rows)
         {
-            Some(x_idx as usize * self.array_width + y_idx as usize)
+            Some(y_idx as usize * self.array_width + x_idx as usize)
         } else {
             None
         }
