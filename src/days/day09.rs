@@ -48,10 +48,10 @@ fn part2(mut data: VecDeque<(u64, u64, u64)>) -> u64 {
     let mut processed = vec![false; data.len()];
     processed[0] = true;
     while !processed.iter().all(|&x| x) {
-        
+
         //start by getting the back element
         let (back_id, back_blocks, back_free) = data.pop_back().unwrap();
-        
+
         // if the back element has already been processed, skip it and add to attempted
         // This doesn't seem to matter for my input but would prevent edge cases where a second move is possible
         if processed[back_id as usize] {
@@ -61,24 +61,26 @@ fn part2(mut data: VecDeque<(u64, u64, u64)>) -> u64 {
 
         // walk forward through the data until we find a front element that can fit the back blocks
         let mut temp = VecDeque::new();
-        let mut placed = false;
-        while data.len() > 0 {
+        while !processed[back_id as usize] && data.len() > 0 {
             let (front_id, front_blocks, front_free) = data.pop_front().unwrap();
-            if !placed && back_blocks <= front_free { // place the back blocks here
+            if  back_blocks <= front_free { // place the back blocks here
                 temp.push_back((front_id, front_blocks, 0));
                 temp.push_back((back_id, back_blocks, front_free - back_blocks));
-                placed = true;
+                processed[back_id as usize] = true;
             } else {
                 temp.push_back((front_id, front_blocks, front_free));
             }
         }
-        if !placed {
+        temp.extend(data.iter());
+        if !processed[back_id as usize] {
             attempted.push((back_id, back_blocks, back_free));
-        } else if let Some((t1, t2, t3)) = temp.pop_back() {
-                temp.push_back((t1, t2, t3 + back_free + back_blocks));
+            processed[back_id as usize] = true;
+        } else {
+            let (t1, t2, t3) = temp.pop_back().unwrap();
+            temp.push_back((t1, t2, t3 + back_free + back_blocks));
         }
-        processed[back_id as usize] = true;
-        data = temp.clone();
+        
+        data = temp;
     }
     data.extend(attempted.iter().rev());
     let mut p2 = 0 ;
