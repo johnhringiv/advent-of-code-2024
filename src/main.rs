@@ -14,6 +14,7 @@ fn main() {
         day06::solve,
         day07::solve,
         day08::solve,
+        day09::solve,
     ];
     println!(
         "{0: <3} | {1: <10} | {2: <14} | {3: <10}",
