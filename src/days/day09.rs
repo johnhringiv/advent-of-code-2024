@@ -44,7 +44,7 @@ fn part1(mut data: VecDeque<(u64, u64, u64)>) -> usize {
 
 // p2 requires u64 should update the template to use u64
 fn part2(mut data: VecDeque<(u64, u64, u64)>) -> u64 {
-    let mut attempted = Vec::new();
+    let mut attempted = VecDeque::new();
     let mut processed = vec![false; data.len()];
     processed[0] = true;
     while !processed.iter().all(|&x| x) {
@@ -55,25 +55,25 @@ fn part2(mut data: VecDeque<(u64, u64, u64)>) -> u64 {
         // if the back element has already been processed, skip it and add to attempted
         // This doesn't seem to matter for my input but would prevent edge cases where a second move is possible
         if processed[back_id as usize] {
-            attempted.push((back_id, back_blocks, back_free));
+            attempted.push_back((back_id, back_blocks, back_free));
             continue;
         }
 
         // walk forward through the data until we find a front element that can fit the back blocks
         let mut temp = VecDeque::new();
-        while !processed[back_id as usize] && data.len() > 0 {
-            let (front_id, front_blocks, front_free) = data.pop_front().unwrap();
+        while let Some((front_id, front_blocks, front_free)) = data.pop_front() {
             if  back_blocks <= front_free { // place the back blocks here
                 temp.push_back((front_id, front_blocks, 0));
                 temp.push_back((back_id, back_blocks, front_free - back_blocks));
                 processed[back_id as usize] = true;
+                break
             } else {
                 temp.push_back((front_id, front_blocks, front_free));
             }
         }
         temp.extend(data.iter());
         if !processed[back_id as usize] {
-            attempted.push((back_id, back_blocks, back_free));
+            attempted.push_back((back_id, back_blocks, back_free));
             processed[back_id as usize] = true;
         } else {
             let (t1, t2, t3) = temp.pop_back().unwrap();
@@ -82,7 +82,7 @@ fn part2(mut data: VecDeque<(u64, u64, u64)>) -> u64 {
         
         data = temp;
     }
-    data.extend(attempted.iter().rev());
+    data.extend(attempted);
     let mut p2 = 0 ;
     let mut idx = 0;
     for (id, mut blocks, free) in data {
@@ -115,7 +115,6 @@ mod tests {
         let input_file = BufReader::new(TEST.as_bytes());
         let data = parse_data(input_file);
         assert_eq!(part1(data), 1928);
-        //assert_eq!(11, part1(&left, &right));
     }
 
     #[test]
