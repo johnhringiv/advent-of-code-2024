@@ -1,61 +1,13 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 
-struct Grid {
-    grid: Vec<u32>,
-    array_width: usize,
-    num_rows: usize,
-}
+use crate::days::grid::{Grid, ParseData};
 
-impl Grid {
-    fn parse_data<R: BufRead>(reader: R) -> Grid {
-        let mut file_iter = reader.lines().peekable();
-        let array_width = file_iter.peek().unwrap().as_ref().unwrap().len();
-        let grid = file_iter.map(|l| l.unwrap().chars().map(|c| c.to_digit(10).unwrap()).collect::<Vec<_>>()).flatten().collect::<Vec<u32>>();
-        let num_rows = grid.len() / array_width;
-        Grid { grid, array_width, num_rows}
-    }
-
-    fn move_pos(&self, pos: usize, coords: (isize, isize)) -> Option<usize> {
-        let (x, y) = coords;
-        let y_idx = (pos / self.array_width) as isize + y;
-        let x_idx = (pos % self.array_width) as isize + x;
-
-        if (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < self.num_rows as isize)
-        {
-            Some(y_idx as usize * self.array_width + x_idx as usize)
-        } else {
-            None
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.grid.len()
-    }
-
-    fn peek(&self, pos: usize) -> u32 {
-        self.grid[pos]
-    }
-}
-
-impl Display for Grid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut row_start = 0;
-        while row_start < self.len() {
-            write!(f, "{}\n", &self.grid[row_start..row_start + self.array_width].iter().map(|d| d.to_string()).collect::<String>())?;
-            row_start += self.array_width;
-        }
-        write!(f, "\n")
-    }
-}
-
-fn combined(grid: &Grid) -> (usize, usize) {
+fn combined(grid: &Grid<u32>) -> (usize, usize) {
     let mut trail_index: HashMap<usize, HashSet<Vec<usize>>> = HashMap::new();
-    
-    fn find_trails(grid: &Grid, cur_pos: usize, mut path: Vec<usize>, all_paths: &mut HashMap<usize, HashSet<Vec<usize>>>) {
+
+    fn find_trails(grid: &Grid<u32>, cur_pos: usize, mut path: Vec<usize>, all_paths: &mut HashMap<usize, HashSet<Vec<usize>>>) {
         if path.len() == 10 {
             all_paths.entry(path[0]).or_insert(HashSet::new()).insert(path[1..].to_owned());
         } else if grid.peek(cur_pos) == path.len() as u32 {

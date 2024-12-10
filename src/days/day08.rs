@@ -10,18 +10,11 @@ struct AntennaMap {
 
 impl AntennaMap {
     fn parse_data<R: BufRead>(reader: R) -> AntennaMap {
-        let mut file_iter = reader.lines();
+        let mut file_iter = reader.lines().peekable();
         let mut antenna = HashMap::new();
-        let line = file_iter.next().unwrap().unwrap();
-        let array_width = line.len() as isize;
+        let array_width = file_iter.peek().unwrap().as_ref().unwrap().len() as isize;
         let mut row = 0;
-        line.chars().enumerate().for_each(|(idx, c)| {
-            if c != '.' {
-                antenna.entry(c).or_insert(Vec::new()).push(idx);
-            }
-        });
         while let Some(line) = file_iter.next() {
-            row += 1;
             line.unwrap().chars().enumerate().for_each(|(idx, c)| {
                 if c != '.' {
                     antenna
@@ -30,10 +23,11 @@ impl AntennaMap {
                         .push(idx + (array_width * row) as usize);
                 }
             });
+            row += 1;
         }
         AntennaMap {
             array_width,
-            num_rows: row + 1,
+            num_rows: row,
             antenna,
         }
     }

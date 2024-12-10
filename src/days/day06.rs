@@ -1,75 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::io::BufRead;
-use std::fmt;
-use std::fmt::Display;
+use crate::days::grid::{Grid, ParseData};
 
-#[derive(Debug, Clone)]
-struct Grid {
-    grid: Vec<char>,
-    array_width: usize,
-}
-
-impl Grid {
-    fn parse_data<R: BufRead>(reader: R) -> Grid {
-        let mut file_iter = reader.lines();
-        let mut grid = file_iter
-            .next()
-            .unwrap()
-            .unwrap()
-            .chars()
-            .collect::<Vec<char>>();
-        let array_width = grid.len();
-        while let Some(line) = file_iter.next() {
-            grid.extend(line.unwrap().chars());
-        }
-        Grid { grid, array_width }
-    }
-
-    fn pos_to_coords(&self, pos: usize) -> (usize, usize) {
-        ((pos % self.array_width), (pos / self.array_width))
-    }
-
-    fn coords_to_pos(&self, x: usize, y: usize) -> usize {
-        y * self.array_width + x
-    }
-
-    fn move_pos(&self, pos: usize, coords: (isize, isize)) -> Option<usize> {
-        let (x, y) = coords;
-        let y_idx = (pos / self.array_width) as isize + y;
-        let x_idx = (pos % self.array_width) as isize + x;
-        let num_rows = (self.grid.len() / self.array_width) as isize;
-
-        if (x_idx >= 0) && (x_idx < self.array_width as isize) && (y_idx >= 0) && (y_idx < num_rows)
-        {
-            Some(y_idx as usize * self.array_width + x_idx as usize)
-        } else {
-            None
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.grid.len()
-    }
-
-    fn peek(&self, pos: usize) -> char {
-        self.grid[pos]
-    }
-}
-
-impl Display for Grid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut row_start = 0;
-        while row_start < self.len() {
-            write!(f, "{}\n", &self.grid[row_start..row_start + self.array_width].iter().collect::<String>())?;
-            row_start += self.array_width;
-        }
-        write!(f, "\n")
-    }
-}
-
-fn find_guard(grid: &Grid) -> Option<(usize, (isize, isize))> {
+fn find_guard(grid: &Grid<char>) -> Option<(usize, (isize, isize))> {
     // finds guard and direction
-    let pos = grid.grid.iter().position(|c| ['^', 'v', '<', '>'].contains(c)).unwrap();
+    let pos = grid.get_grid().iter().position(|c| ['^', 'v', '<', '>'].contains(c)).unwrap();
     let direction = match grid.peek(pos) {
         '^' => (0, -1),
         'v' => (0, 1),
@@ -80,11 +14,11 @@ fn find_guard(grid: &Grid) -> Option<(usize, (isize, isize))> {
     Some((pos, direction))
 }
 
-fn map_obstructions(grid: &Grid) -> (HashMap<usize, HashSet<usize>>, HashMap<usize, HashSet<usize>>) {
+fn map_obstructions(grid: &Grid<char>) -> (HashMap<usize, HashSet<usize>>, HashMap<usize, HashSet<usize>>) {
     let mut obs_x = HashMap::new();
     let mut obs_y = HashMap::new();
-
-    for (idx, c) in grid.grid.iter().enumerate() {
+    
+    for (idx, c) in grid.get_grid().iter().enumerate() {
         if *c == '#' {
             let (x, y) = grid.pos_to_coords(idx);
             obs_x.entry(x).or_insert(HashSet::new()).insert(y);
@@ -94,7 +28,7 @@ fn map_obstructions(grid: &Grid) -> (HashMap<usize, HashSet<usize>>, HashMap<usi
     (obs_x, obs_y)
 }
 
-fn get_next_obs(cur_pos: usize, grid: &Grid, direction: &(isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> Option<(usize, (isize, isize))> {
+fn get_next_obs(cur_pos: usize, grid: &Grid<char>, direction: &(isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> Option<(usize, (isize, isize))> {
     let (x, y) = grid.pos_to_coords(cur_pos);
     let mut obs_coords = None;
     match direction {
@@ -151,7 +85,7 @@ fn change_direction(direction: &(isize, isize)) -> (isize, isize) {
     }
 }
 
-fn move_guard(grid: &Grid, pos: usize, direction: &(isize, isize)) -> Option<(usize, (isize, isize))> {
+fn move_guard(grid: &Grid<char>, pos: usize, direction: &(isize, isize)) -> Option<(usize, (isize, isize))> {
     match grid.move_pos(pos, *direction) {
         Some(new_pos) => {
             match grid.peek(new_pos) {
@@ -167,7 +101,7 @@ fn move_guard(grid: &Grid, pos: usize, direction: &(isize, isize)) -> Option<(us
         None => None,
     }
 }
-fn get_visited(grid: &Grid, start: &Option<(usize, (isize, isize))>) -> HashMap<usize, (isize, isize)> {
+fn get_visited(grid: &Grid<char>, start: &Option<(usize, (isize, isize))>) -> HashMap<usize, (isize, isize)> {
     let mut guard_pos = start.clone();
     let mut states = HashMap::new();
     loop {
@@ -185,10 +119,9 @@ fn get_visited(grid: &Grid, start: &Option<(usize, (isize, isize))>) -> HashMap<
     states
 }
 
-fn has_loop(grid: &Grid, temp_obs: usize, start_direction: (isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> bool {
+fn has_loop(grid: &Grid<char>, temp_obs: usize, start_direction: (isize, isize), obs_x: &HashMap<usize, HashSet<usize>>, obs_y: &HashMap<usize, HashSet<usize>>) -> bool {
     let mut visited_obs = HashMap::new();
-    let (x, y) = grid.pos_to_coords(temp_obs);
-    let mut pos = grid.coords_to_pos((x as isize - start_direction.0) as usize, (y as isize - start_direction.1) as usize);
+    let mut pos = grid.move_pos(temp_obs, (- start_direction.0, - start_direction.1)).unwrap();
     let mut direction = start_direction;
     loop {
         match get_next_obs(pos, grid, &direction, &obs_x, &obs_y) {
@@ -212,7 +145,7 @@ fn has_loop(grid: &Grid, temp_obs: usize, start_direction: (isize, isize), obs_x
     }
 }
 
-fn combined(grid: &Grid) -> (usize, usize) {
+fn combined(grid: &Grid<char>) -> (usize, usize) {
     let start = find_guard(&grid);
     let mut visited = get_visited(&grid, &start);
     let p1 = visited.len();
